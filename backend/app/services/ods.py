@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.ingest import IngestService
 
 MODULE = "ods"
 REQUIRED_FIELDS = ["表编号", "表名称", "来源系统"]
@@ -13,6 +14,9 @@ NEGATIVE_ACTIONS = ["下线表"]
 
 
 class OdsService:
+    def __init__(self) -> None:
+        self.ingest = IngestService()
+
     def list_entries(
         self,
         *,
@@ -32,6 +36,22 @@ class OdsService:
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
         return store.find(MODULE, entry_id)
+
+    def get_detail(self, entry_id: int) -> dict[str, Any] | None:
+        """贴源表明细：带出可用范围、版本与同批审计记录。"""
+        entry = self.get_entry(entry_id)
+        if entry is None:
+            return None
+        table_code = str(entry.get("表编号") or "")
+        version = next(
+            (row for row in self.ingest.list_versions(table_code=table_code) if row.get("状态") == "生效"),
+            None,
+        )
+        audits = [
+            row for row in store.rows("auditlog")
+            if str(row.get("操作表名", "")).split("/")[0] == table_code
+        ]
+        return {"entry": entry, "version": version, "audit": audits}
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
@@ -55,6 +75,10 @@ class OdsService:
         target = ACTION_RULES[action]
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"
+        if action == "确认上线":
+            # 上线前置条件是 2026-10-12 的业务日已经有生效版本，否则 ODS 查询不可用。
+            if not entry.get("当前生效版本"):
+                return None, "尚无通过校验的入湖版本，贴源表不能上线；请先完成分片校验并发布"
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS

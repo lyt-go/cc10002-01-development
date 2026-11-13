@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/ods", tags=["贴源层"])
 
 service = OdsService()
 
-LIST_FIELDS = ["表编号", "表名称", "来源系统", "原始字段数", "增量字段", "全量快照策略", "每日增量行", "最近加载时间"]
+LIST_FIELDS = ["表编号", "表名称", "来源系统", "可用状态", "可用范围", "当前生效版本", "最近加载时间"]
 STATUSES = ["草稿", "建表审批中", "已上线", "已下线"]
 
 
@@ -30,13 +30,20 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出贴源层清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "ods", "total": total, "items": items}
+
+
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
-    """读取单条贴源表明细；不存在时给出可读的错误说明。"""
-    entry = service.get_entry(entry_id)
-    if entry is None:
+    """读取单条贴源表明细；带出可用范围、生效版本与同批审计。"""
+    detail = service.get_detail(entry_id)
+    if detail is None:
         raise HTTPException(status_code=404, detail=f"贴源表 {entry_id} 不存在或已归档")
-    return entry
+    return detail
 
 
 @router.post("", response_model=ActionResult)
@@ -56,10 +63,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出贴源层清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "ods", "total": total, "items": items}

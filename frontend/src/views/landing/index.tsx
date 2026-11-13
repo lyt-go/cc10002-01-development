@@ -8,8 +8,10 @@ const columns = [
   "来源系统",
   "落地路径",
   "文件格式",
-  "接收时间",
+  "字节大小",
+  "业务日期",
   "原始行数",
+  "进度",
   "校验摘要",
   "批次状态"
 ]
@@ -22,6 +24,7 @@ const statuses = [
   "草稿",
   "落地中",
   "已落地",
+  "摘要在途冲突",
   "已归档"
 ]
 const stats = [
@@ -45,6 +48,7 @@ export default function LandingView() {
   const [rows, setRows] = useState<Row[]>([])
   const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [errorText, setErrorText] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
   const filterFields = useMemo(() => columns.slice(0, 3), [])
 
@@ -75,9 +79,11 @@ export default function LandingView() {
         method: 'POST',
         body: JSON.stringify({ action }),
       })
-      if (!response.ok) {
-        throw new Error('原始落地动作未生效，请稍后重试')
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message ?? '原始落地动作未生效，请稍后重试')
       }
+      setErrorText(payload.message ?? '')
       await reload()
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '原始落地操作失败')
@@ -92,8 +98,8 @@ export default function LandingView() {
           <p className="page-desc">管理从各源系统接入的原始数据落地批次，记录文件格式、行数和校验摘要。</p>
         </div>
         <div className="page-actions">
-          <button className="btn primary" type="button" onClick={() => setErrorMessage('落地批次登记入口尚未接入审批流')}>
-            登记落地批次
+          <button className="btn primary" type="button" onClick={() => { window.location.href = '/ingest' }}>
+            登记入湖批次
           </button>
           <button className="btn" type="button" onClick={() => window.open(`${ENDPOINT}/export`, '_blank')}>
             导出原始落地清单
@@ -155,6 +161,7 @@ export default function LandingView() {
 
       <footer className="page-foot">
         <span>共 {total} 条原始落地记录</span>
+        {errorText && <span className="page-desc">{errorText}</span>}
         {errorMessage && <span className="error-text">{errorMessage}</span>}
       </footer>
     </section>

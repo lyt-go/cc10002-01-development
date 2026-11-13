@@ -33,3 +33,14 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .link { border: none; background: none; color: var(--brand); cursor: pointer; padding: 0; }
 .page-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .error-text { color: #b42318; }
+
+/* 入湖编排页补充样式 */
+.section-title { font-size: 14px; margin: 20px 0 8px; color: #344054; }
+.cell-input { width: 100%; min-width: 64px; border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.cell-input.narrow { width: 80px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
+.gap-cell { color: #b42318; max-width: 320px; }
+.tag.ok { background: #ecfdf3; color: #027a48; border-radius: 10px; padding: 1px 8px; font-size: 12px; }
+.tag.warn { background: #fef3f2; color: #b42318; border-radius: 10px; padding: 1px 8px; font-size: 12px; }
+.detail { margin-top: 16px; }
+.resume-box { border: 1px dashed var(--border); border-radius: 6px; padding: 8px 10px; background: #fbfcfe; margin-top: 8px; font-size: 13px; }

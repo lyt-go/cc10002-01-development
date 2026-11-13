@@ -6,17 +6,29 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.seed import SEED_ROWS
+from app.seed import INGEST_SEED, SEED_ROWS
+
+# 入湖编排的内部表：由 services/ingest 维护，不作为独立的业务模块暴露到概览里。
+INTERNAL_MODULES = {"ingest_units", "ods_versions"}
 
 
 class Store:
     def __init__(self) -> None:
-        self._tables: dict[str, list[dict[str, Any]]] = {
-            name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
-        }
+        self.reset()
+
+    @staticmethod
+    def _initial_rows() -> dict[str, list[dict[str, Any]]]:
+        tables = {name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()}
+        for name, rows in INGEST_SEED.items():
+            tables[name] = [dict(row) for row in rows]
+        return tables
+
+    def reset(self) -> None:
+        """恢复示例数据：测试与本地演示需要从同一份初始数据重新开始。"""
+        self._tables = self._initial_rows()
 
     def module_names(self) -> list[str]:
-        return sorted(self._tables)
+        return sorted(name for name in self._tables if name not in INTERNAL_MODULES)
 
     def rows(self, module: str) -> list[dict[str, Any]]:
         return self._tables.setdefault(module, [])
@@ -26,6 +38,16 @@ class Store:
             if int(row.get("id", 0)) == entry_id:
                 return row
         return None
+
+    def find_by(self, module: str, field: str, value: Any) -> dict[str, Any] | None:
+        """按业务字段查一行，找不到返回 None；不在这里改数据。"""
+        for row in self.rows(module):
+            if row.get(field) == value:
+                return row
+        return None
+
+    def next_id(self, module: str) -> int:
+        return max((int(row.get("id", 0)) for row in self.rows(module)), default=0) + 1
 
     def overview(self) -> dict[str, object]:
         modules: list[dict[str, object]] = []

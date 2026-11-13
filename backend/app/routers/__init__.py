@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from app.routers import landing as router_landing
+from app.routers import ingest as router_ingest
 from app.routers import ods as router_ods
 from app.routers import dwd as router_dwd
 from app.routers import dim as router_dim
@@ -25,4 +26,4 @@ from app.routers import cost as router_cost
 from app.routers import sync as router_sync
 from app.routers import auditlog as router_auditlog
 
-ROUTERS = [router_landing, router_ods, router_dwd, router_dim, router_dws, router_ads, router_partition, router_quality, router_lineage, router_backfill, router_cleanrule, router_transform, router_dictionary, router_metamodel, router_lifecycle, router_cost, router_sync, router_auditlog]
+ROUTERS = [router_ingest, router_landing, router_ods, router_dwd, router_dim, router_dws, router_ads, router_partition, router_quality, router_lineage, router_backfill, router_cleanrule, router_transform, router_dictionary, router_metamodel, router_lifecycle, router_cost, router_sync, router_auditlog]

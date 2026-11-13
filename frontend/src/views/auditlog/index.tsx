@@ -9,6 +9,7 @@ const columns = [
   "变更类型",
   "变更前值",
   "变更后值",
+  "关联批次",
   "操作人",
   "操作时间",
   "变更原因"
@@ -44,13 +45,15 @@ export default function AuditlogView() {
   const [total, setTotal] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
   const [filters, setFilters] = useState<Record<string, string>>({})
-  const filterFields = useMemo(() => columns.slice(0, 3), [])
+  const filterFields = useMemo(() => ['记录编号', '关联批次'], [])
 
   const reload = useCallback(async () => {
     setErrorMessage('')
-    const query = new URLSearchParams(filters).toString()
+    const query = new URLSearchParams()
+    if (filters['记录编号']) query.set('keyword', filters['记录编号'])
+    if (filters['关联批次']) query.set('batch_no', filters['关联批次'])
     try {
-      const response = await request(`${ENDPOINT}?${query}`)
+      const response = await request(`${ENDPOINT}?${query.toString()}`)
       if (!response.ok) {
         throw new Error('变更记录列表读取失败')
       }
@@ -90,8 +93,8 @@ export default function AuditlogView() {
           <p className="page-desc">记录所有表结构、数据和质量规则的变更历史，支持回溯和合规审计。</p>
         </div>
         <div className="page-actions">
-          <button className="btn primary" type="button" onClick={() => setErrorMessage('变更记录登记入口尚未接入审批流')}>
-            登记变更记录
+          <button className="btn primary" type="button" onClick={() => { window.location.href = '/ingest' }}>
+            前往入湖编排登记
           </button>
           <button className="btn" type="button" onClick={() => window.open(`${ENDPOINT}/export`, '_blank')}>
             导出变更审计清单

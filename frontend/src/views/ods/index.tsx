@@ -7,10 +7,9 @@ const columns = [
   "表编号",
   "表名称",
   "来源系统",
-  "原始字段数",
-  "增量字段",
-  "全量快照策略",
-  "每日增量行",
+  "可用状态",
+  "可用范围",
+  "当前生效版本",
   "最近加载时间"
 ]
 const actions = [
@@ -75,8 +74,9 @@ export default function OdsView() {
         method: 'POST',
         body: JSON.stringify({ action }),
       })
-      if (!response.ok) {
-        throw new Error('贴源层动作未生效，请稍后重试')
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message ?? '贴源层动作未生效，请稍后重试')
       }
       await reload()
     } catch (error) {
@@ -92,8 +92,8 @@ export default function OdsView() {
           <p className="page-desc">管理贴源层（ODS）数据表，保持与源系统结构一致，记录增量快照和加载状态。</p>
         </div>
         <div className="page-actions">
-          <button className="btn primary" type="button" onClick={() => setErrorMessage('贴源表登记入口尚未接入审批流')}>
-            登记贴源表
+          <button className="btn primary" type="button" onClick={() => { window.location.href = '/ingest' }}>
+            前往入湖编排登记
           </button>
           <button className="btn" type="button" onClick={() => window.open(`${ENDPOINT}/export`, '_blank')}>
             导出贴源层清单

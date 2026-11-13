@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/auditlog", tags=["变更审计"])
 
 service = AuditlogService()
 
-LIST_FIELDS = ["记录编号", "操作表名", "变更类型", "变更前值", "变更后值", "操作人", "操作时间", "变更原因"]
+LIST_FIELDS = ["记录编号", "操作表名", "变更类型", "变更前值", "变更后值", "关联批次", "操作人", "操作时间", "变更原因"]
 STATUSES = ["草稿", "已记录", "已复核"]
 
 
@@ -20,14 +20,22 @@ STATUSES = ["草稿", "已记录", "已复核"]
 def list_entries(
     keyword: str | None = Query(default=None, description="按记录编号检索"),
     status: str | None = Query(default=None, description="草稿、已记录、已复核"),
+    batch_no: str | None = Query(default=None, description="按关联入湖批次检索"),
     page: int = 1,
     size: int = 20,
 ) -> PageResult[dict]:
-    """按记录编号与状态过滤变更审计列表；没有数据时返回空页，不报错。"""
+    """按记录编号、状态与关联批次过滤变更审计列表；没有数据时返回空页，不报错。"""
     if size > 200:
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
-    items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
+    items, total = service.list_entries(keyword=keyword, status=status, batch_no=batch_no, page=page, size=size)
     return PageResult(items=items, total=total, page=page, size=size)
+
+
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出变更审计清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "auditlog", "total": total, "items": items}
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -56,10 +64,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出变更审计清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "auditlog", "total": total, "items": items}

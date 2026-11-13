@@ -4,15 +4,19 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.ingest import BATCH_STATUSES, IngestError, IngestService
 
 MODULE = "landing"
 REQUIRED_FIELDS = ["批次编号", "来源系统", "落地路径"]
-STATUS_ORDER = ["草稿", "落地中", "已落地", "已归档"]
+STATUS_ORDER = BATCH_STATUSES
 ACTION_RULES = {"发起落地": "落地中", "确认已落地": "已落地", "归档批次": "已归档"}
 NEGATIVE_ACTIONS = []
 
 
 class LandingService:
+    def __init__(self) -> None:
+        self.ingest = IngestService()
+
     def list_entries(
         self,
         *,
@@ -33,18 +37,13 @@ class LandingService:
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
         return store.find(MODULE, entry_id)
 
-    def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
-        missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
-        if missing:
-            return None, missing
-        rows = store.rows(MODULE)
-        entry = {"id": max((int(row.get("id", 0)) for row in rows), default=0) + 1}
-        entry.update({field: values.get(field) for field in REQUIRED_FIELDS})
-        entry["status"] = STATUS_ORDER[0]
-        entry["pending"] = True
-        entry["abnormal"] = False
-        rows.append(entry)
-        return entry, []
+    def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+        """登记原始文件清单：与贴源表加载共用同一份入湖提交，不再单独建批次。"""
+        try:
+            entry = self.ingest.register_batch(values)
+        except IngestError as exc:
+            return None, str(exc)
+        return entry, ""
 
     def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
         entry = store.find(MODULE, entry_id)
@@ -53,8 +52,15 @@ class LandingService:
         if action not in ACTION_RULES:
             return None, f"动作「{action}」不属于原始落地可执行范围"
         target = ACTION_RULES[action]
-        if target not in STATUS_ORDER:
-            return None, f"目标状态「{target}」不在允许的状态序列里"
+        if entry.get("status") == "已落地" and action != "归档批次":
+            return None, "批次已发布贴源表版本，不允许回退状态"
+        if action == "确认已落地":
+            # 人工确认也必须走一次入湖提交：分片不齐时不能把批次标成已落地。
+            try:
+                progress = self.ingest.publish(str(entry.get("批次编号")))
+            except IngestError as exc:
+                return None, f"{exc}；批次保持{entry.get('status')}，不能人工置为已落地"
+            return entry, f"落地批次已确认，贴源表版本 {progress.get('version')} 已发布"
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
